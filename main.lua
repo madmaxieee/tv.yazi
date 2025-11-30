@@ -50,6 +50,9 @@ end
 
 local on_cable_output = {
   files = function(cwd, output)
+    if output == "" then
+      return
+    end
     local url = Url(strip(output))
     ---@diagnostic disable-next-line: undefined-field
     if not url.is_absolute then
@@ -59,6 +62,9 @@ local on_cable_output = {
     return nil
   end,
   text = function(cwd, output)
+    if output == "" then
+      return
+    end
     local file, line = output:match [[(.+):(%d+)]]
     if file == nil or line == nil then
       return Err("Output '%s' does not match the expected pattern", output)
