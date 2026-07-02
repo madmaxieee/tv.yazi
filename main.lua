@@ -1,4 +1,4 @@
----@diagnostic disable: redefined-local
+---@diagnostic disable: redefined-local, undefined-field
 
 local M = {}
 
@@ -16,31 +16,36 @@ local function err_notify(err)
   }
 end
 
-local function run_tv(cwd, cable)
-  local child, err = Command("tv")
-    :arg({ cable })
-    :cwd(tostring(cwd))
-    ---@diagnostic disable-next-line: undefined-field
-    :stdin(Command.INHERIT)
-    ---@diagnostic disable-next-line: undefined-field
-    :stdout(Command.PIPED)
-    ---@diagnostic disable-next-line: undefined-field
-    :stderr(Command.INHERIT)
-    :spawn()
+local function run_tv(cwd, channel)
+  local function _run_tv_internal()
+    local child, err = Command("tv")
+      :arg({ channel })
+      :cwd(tostring(cwd))
+      :stdin(Command.INHERIT)
+      :stdout(Command.PIPED)
+      :stderr(Command.INHERIT)
+      :spawn()
 
-  if not child then
-    return nil, Err("Failed to start `tv`, error: %s", err)
+    if not child then
+      return nil, Err("Failed to start `tv`, error: %s", err)
+    end
+
+    local output, err = child:wait_with_output()
+
+    if not output then
+      return nil, Err("Cannot read `tv` output, error: %s", err)
+    elseif not output.status.success and output.status.code ~= 130 then
+      return nil, Err("`tv` exited with error code %s", output.status.code)
+    end
+
+    return output.stdout, nil
   end
 
-  local output, err = child:wait_with_output()
+  local permit = ui.hide()
+  local result, err = _run_tv_internal()
+  permit:drop()
 
-  if not output then
-    return nil, Err("Cannot read `tv` output, error: %s", err)
-  elseif not output.status.success and output.status.code ~= 130 then
-    return nil, Err("`tv` exited with error code %s", output.status.code)
-  end
-
-  return output.stdout
+  return result, err
 end
 
 local on_cable_output = {
@@ -49,7 +54,6 @@ local on_cable_output = {
       return
     end
     local url = Url(strip(output))
-    ---@diagnostic disable-next-line: undefined-field
     if not url.is_absolute then
       url = cwd:join(url)
     end
@@ -65,14 +69,13 @@ local on_cable_output = {
       return Err("Output '%s' does not match the expected pattern", output)
     end
     local url = Url(file)
-    ---@diagnostic disable-next-line: undefined-field
     if not url.is_absolute then
       url = cwd:join(url)
     end
     local line_number = tonumber(line)
     ya.emit("reveal", { url, raw = true })
     ya.emit("shell", {
-      ([[nvim "$0" "+:%d"]]):format(line_number),
+      ([[nvim "+%d" "$0"]]):format(line_number),
       block = true,
     })
     return nil
