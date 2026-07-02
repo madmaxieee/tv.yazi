@@ -16,11 +16,6 @@ local function err_notify(err)
   }
 end
 
----@type fun(): Url
-local get_cwd = ya.sync(function()
-  return cx.active.current.cwd
-end)
-
 local function run_tv(cwd, cable)
   local child, err = Command("tv")
     :arg({ cable })
@@ -87,9 +82,11 @@ local on_cable_output = {
 function M:entry(job)
   ya.emit("escape", { visual = true })
 
-  ya.hide()
-
-  local cwd = get_cwd()
+  local cwd, err = fs.cwd()
+  if err ~= nil then
+    err_notify(err)
+    return
+  end
 
   local cable
   if #job.args == 0 then
